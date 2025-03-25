@@ -1,6 +1,25 @@
 # Vibe Farmer
 
-Vibe Coded Farming Game, using Google's Gemini 2.5 Pro Experimental
+## TL;DR
+
+Vibe Coded Farming Game, using Google's Gemini 2.5 Pro Experimental:
+
+### Gameplay
+
+* Collect seeds from weed; stone and wood
+* Plant the seeds and watch them grow
+* Harvest for coin
+* Buy upgrades
+
+### Screenshot
+
+![image.png](image.png)
+
+### Just Play It!
+
+Clone this project, run with `npx serve` (with Node.js installed) in the project root.
+
+## Creation Process
 
 _System Prompt_
 

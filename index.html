@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2.5D Farming Sim</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas"></canvas>
+        <div id="ui-overlay">
+            <div id="info-panel">
+                <h2>Day: <span id="day-counter">1</span></h2>
+                <h3>Actions Left: <span id="actions-left">10</span></h3>
+            </div>
+            <div id="inventory-panel">
+                <h4>Inventory</h4>
+                <div>Coins: <span id="coins-count">0</span></div>
+                <div>Wood: <span id="wood-count">0</span></div>
+                <div>Stone: <span id="stone-count">0</span></div>
+                <div id="seeds-inventory">
+                    <!-- Seed counts will be added here by JS -->
+                </div>
+            </div>
+             <div id="selected-seed-panel">
+                Selected Seed: <span id="selected-seed-name">None</span>
+                <button id="deselect-seed-button">Deselect</button>
+            </div>
+            <div id="message-log">
+                <p id="message-text">Welcome! Click on the grid to interact.</p>
+            </div>
+            <div id="upgrades-panel">
+                <h4>Upgrades</h4>
+                <div id="upgrades-list">
+                     <!-- Upgrades will be added here by JS -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Import Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://unpkg.com/three@0.157.0/build/three.module.js"
+            }
+        }
+    </script>
+
+    <!-- Import Game Modules -->
+    <script type="module" src="main.js"></script>
+</body>
+</html>

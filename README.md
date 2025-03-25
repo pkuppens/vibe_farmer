@@ -16,3 +16,26 @@ Overnight, empty cells are converted with 25% chance to a new trash item. Farm p
 Fully grown plots can be harvested for fruit that yields the grow time in coins.
 Upgrades can be bought for coin+resource combinations, e.g. beehive = 5 wood + 8 coins -> farm cycle decreases 1 day (with a minimum of 2 days).
 Add fun new seeds, rules, upgrades.
+
+
+## Zero-Shot Settings
+
+Temperature has been reduced to 0.2.
+
+AI Studio Chat Link, if functional:
+
+https://aistudio.google.com/prompts/1HnGmFCfX5beNoYrkFb_fKMFRzMTA1dTC
+
+## Zero-Shot Results
+
+Token count: 16261
+
+### Thoughts
+
+See [ZERO_SHOT.thoughts.md](ZERO_SHOT.thoughts.md)
+
+### Results
+
+Contains a transcript with all files to be created, and how to run.
+
+See [ZERO_SHOT.response.md](ZERO_SHOT.response.md)

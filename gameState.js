@@ -19,6 +19,7 @@ export class GameState {
             beehive: false,
             fertilizer: false,
             scarecrow: false,
+            rainbowBlessing: false,
             // Add flags for other upgrades as they are created
         };
     }
@@ -91,15 +92,14 @@ export class GameState {
     incrementPlotGrowth(x, y) {
         const cell = this.getCell(x, y);
         if (cell && cell.type === CONFIG.CELL_TYPES.PLOT && cell.content) {
-            if (cell.content.growthStage < cell.content.maxGrowth) {
-                cell.content.growthStage++;
-                return true; // Grew
-            }
+            // Allow growth stage to exceed maxGrowth to track overdue days
+            cell.content.growthStage++;
+            return true; // Grew or became more overdue
         }
-        return false; // Didn't grow (or not a plot/already grown)
+        return false;
     }
 
-    isPlotFullyGrown(x, y) {
+    isPlotReadyToHarvest(x, y) { // Renamed for clarity
         const cell = this.getCell(x, y);
         return cell
             && cell.type === CONFIG.CELL_TYPES.PLOT

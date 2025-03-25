@@ -15,8 +15,11 @@ export class UIManager {
         this.deselectSeedButton = document.getElementById('deselect-seed-button');
         this.messageText = document.getElementById('message-text');
         this.upgradesListDiv = document.getElementById('upgrades-list');
+        this.tooltipElement = document.getElementById('tooltip'); // Cache tooltip element
 
         this.messageTimeout = null;
+        this.tooltipTimeout = null; // Timer for hover delay
+        this.currentHoverTarget = null; // Track currently hovered cell {x, y}
     }
 
     initialize(gameState, gameLogic) {
@@ -166,6 +169,7 @@ export class UIManager {
                 const isPurchased = upgrade.isPurchased(gameState);
 
                 button.disabled = isPurchased || !canAfford;
+                button.classList.toggle('purchased', isPurchased); // Add/remove purchased class
 
                 if (isPurchased) {
                     button.innerHTML = `${upgrade.name} <small>(Purchased)</small>`;
@@ -174,10 +178,124 @@ export class UIManager {
                         .map(([resource, amount]) => `${amount} ${resource}`)
                         .join(', ');
                      button.innerHTML = `${upgrade.name} <small>(${upgrade.description})</small><br/><small>Cost: ${costString}</small>`;
-                     // Optionally add a class if unaffordable
-                     button.style.opacity = canAfford ? '1' : '0.6';
+                     button.style.opacity = canAfford ? '1' : '0.7'; // Adjust opacity based on affordability
                 }
             }
         }
     }
+
+    // --- Tooltip Methods ---
+
+    handleHover(x, y, event, gameState) {
+        const target = { x, y };
+        // If hovering over the same cell, do nothing
+        if (this.currentHoverTarget && this.currentHoverTarget.x === x && this.currentHoverTarget.y === y) {
+            // Keep existing timeout running, but update position potentially
+            if (this.tooltipElement.style.display === 'block') {
+                    this.positionTooltip(event);
+            }
+            return;
+        }
+
+        // Clear previous timeouts and hide tooltip immediately if target changes
+        this.clearHoverTimeout();
+        this.hideTooltip();
+        this.currentHoverTarget = target;
+
+        // Set a new timeout to show the tooltip after a delay
+        this.tooltipTimeout = setTimeout(() => {
+            this.showTooltip(x, y, event, gameState);
+        }, 1000); // 1 second delay
+    }
+
+    handleHoverEnd() {
+        this.clearHoverTimeout();
+        this.hideTooltip();
+        this.currentHoverTarget = null;
+    }
+
+    clearHoverTimeout() {
+        if (this.tooltipTimeout) {
+            clearTimeout(this.tooltipTimeout);
+            this.tooltipTimeout = null;
+        }
+    }
+
+    showTooltip(x, y, event, gameState) {
+        const cell = gameState.getCell(x, y);
+        if (!cell) return;
+
+        const tooltipText = this.getTooltipText(cell, gameState);
+        if (!tooltipText) {
+            this.hideTooltip();
+            return;
+        }
+
+        this.tooltipElement.innerHTML = tooltipText;
+        this.tooltipElement.style.display = 'block';
+        this.positionTooltip(event);
+    }
+
+    hideTooltip() {
+        this.tooltipElement.style.display = 'none';
+    }
+
+    positionTooltip(event) {
+        // Position tooltip slightly offset from the mouse cursor
+        const offsetX = 15;
+        const offsetY = 10;
+        let newX = event.clientX + offsetX;
+        let newY = event.clientY + offsetY;
+
+        // Prevent tooltip from going off-screen
+        const tooltipRect = this.tooltipElement.getBoundingClientRect();
+        const bodyRect = document.body.getBoundingClientRect();
+
+        if (newX + tooltipRect.width > bodyRect.width) {
+            newX = event.clientX - tooltipRect.width - offsetX;
+        }
+        if (newY + tooltipRect.height > bodyRect.height) {
+            newY = event.clientY - tooltipRect.height - offsetY;
+        }
+
+        this.tooltipElement.style.left = `${newX}px`;
+        this.tooltipElement.style.top = `${newY}px`;
+    }
+
+    getTooltipText(cell, gameState) {
+        const { type, content } = cell;
+
+        switch (type) {
+            case CONFIG.CELL_TYPES.EMPTY:
+                return gameState.selectedSeed
+                    ? `Plant ${CONFIG.SEEDS[gameState.selectedSeed]?.name}`
+                    : "Empty Land (Select Seed to Plant)";
+            case CONFIG.CELL_TYPES.WEED:
+                return "Clear Weed (Get Random Seed)";
+            case CONFIG.CELL_TYPES.WOOD:
+                return "Collect Wood (+1 Wood)";
+            case CONFIG.CELL_TYPES.STONE:
+                return "Collect Stone (+1 Stone)";
+            case CONFIG.CELL_TYPES.COIN_SPAWN:
+                return "Collect Coin (+1 Coin)";
+            case CONFIG.CELL_TYPES.PLOT:
+                if (content && content.seedType) {
+                    const seedConfig = CONFIG.SEEDS[content.seedType];
+                    const isReady = content.growthStage >= content.maxGrowth;
+                    if (isReady) {
+                        const currentYield = calculateYield(content.seedType, content.growthStage, content.maxGrowth, gameState);
+                        const overdueDays = Math.max(0, content.growthStage - content.maxGrowth);
+                        let decayText = overdueDays > 0 ? ` (-${overdueDays * CONFIG.HARVEST_DECAY_RATE} decay)` : "";
+                        return `Harvest ${seedConfig.name} (${currentYield} Coins${decayText})`;
+                    } else {
+                        return `${seedConfig.name} (${content.growthStage}/${content.maxGrowth} days)`;
+                    }
+                } else {
+                    return "Tilled Plot (Error?)"; // Should have content if plot
+                }
+            default:
+                return null; // No tooltip for unknown types
+        }
+    }
+    
 }

@@ -3,15 +3,18 @@
 import * as THREE from 'three';
 
 export class InteractionManager {
-    constructor(camera, domElement, gameLogic) {
+    constructor(camera, domElement, gameLogic, uiManager, gameState) {
         this.camera = camera;
         this.domElement = domElement;
         this.gameLogic = gameLogic; // Reference to game logic for handling actions
+        this.uiManager = uiManager; // Store uiManager reference
+        this.gameState = gameState; // Store gameState reference
 
         this.raycaster = new THREE.Raycaster();
         this.mouse = new THREE.Vector2();
 
         this.boundOnClick = this.onClick.bind(this); // Bind context once
+        this.boundOnMouseMove = this.onMouseMove.bind(this); // Bind mouse move
     }
 
     setupRaycasting(scene) {
@@ -46,8 +49,28 @@ export class InteractionManager {
         }
     }
 
+    onMouseMove(event) {
+        this.mouse.x = (event.clientX / this.domElement.clientWidth) * 2 - 1;
+        this.mouse.y = -(event.clientY / this.domElement.clientHeight) * 2 + 1;
+
+        this.raycaster.setFromCamera(this.mouse, this.camera);
+        const intersects = this.raycaster.intersectObjects(this.scene.children, true);
+        const intersectedGridCell = intersects.find(intersect => intersect.object.userData.isBaseGrid);
+
+        if (intersectedGridCell) {
+            const { gridX, gridY } = intersectedGridCell.object.userData;
+            // Pass event for positioning, and gameState for getting cell info
+            this.uiManager.handleHover(gridX, gridY, event, this.gameState);
+        } else {
+            // Mouse is not over any grid cell
+            this.uiManager.handleHoverEnd();
+        }
+    }
+
     dispose() {
-        // Clean up event listeners
         this.domElement.removeEventListener('click', this.boundOnClick);
+        this.domElement.removeEventListener('mousemove', this.boundOnMouseMove); // Remove mouse move listener
+        this.domElement.removeEventListener('mouseleave', this.uiManager.handleHoverEnd); // Might need bound version if not arrow func
+        this.uiManager.clearHoverTimeout(); // Ensure timer is cleared on dispose
     }
 }

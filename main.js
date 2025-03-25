@@ -17,7 +17,9 @@ class GameApp {
         this.interactionManager = new InteractionManager(
             this.sceneManager.camera,
             this.sceneManager.renderer.domElement,
-            this.gameLogic // Pass gameLogic instance here
+            this.gameLogic,
+            this.uiManager, // Pass uiManager
+            this.gameState  // Pass gameState
         );
 
         // Make instances accessible globally for easier debugging/UI interaction if needed

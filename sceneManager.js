@@ -181,6 +181,15 @@ export class SceneManager {
                     newMesh = this.createPlantMesh(content, baseMesh.position, meshOffset);
                 }
                 break;
+                case CONFIG.CELL_TYPES.COIN_SPAWN: // Handle coin spawn visual
+                const coinGeom = new THREE.CylinderGeometry(0.2, 0.2, 0.05, 16); // Flat cylinder
+                const coinMat = new THREE.MeshStandardMaterial({ color: CONFIG.COLORS.COIN_SPAWN, metalness: 0.5, roughness: 0.3 });
+                newMesh = new THREE.Mesh(coinGeom, coinMat);
+                newMesh.position.copy(baseMesh.position).y += 0.025 + meshOffset; // Sit flat on ground
+                newMesh.rotation.x = Math.PI / 2; // Lay flat
+                newMesh.castShadow = true;
+                newMesh.receiveShadow = false;
+                break;
             case CONFIG.CELL_TYPES.EMPTY:
             default:
                 // No content mesh needed
@@ -209,40 +218,39 @@ export class SceneManager {
     }
 
      // Helper to create plant meshes based on growth stage
-    createPlantMesh(plotContent, basePosition, yOffset) {
+     createPlantMesh(plotContent, basePosition, yOffset) {
         const { seedType, growthStage, maxGrowth } = plotContent;
         const seedConfig = CONFIG.SEEDS[seedType];
         if (!seedConfig) return null;
 
-        const growthFactor = growthStage / maxGrowth;
-        const isGrown = growthStage >= maxGrowth;
+        // Clamp visual growth stage to maxGrowth for scaling purposes
+        const visualGrowthStage = Math.min(growthStage, maxGrowth);
+        const growthFactor = visualGrowthStage / maxGrowth;
+        const isReady = growthStage >= maxGrowth; // Check if ready/overdue
 
-        // Simple representation: growing sphere/cone
-        const plantHeight = isGrown ? 0.6 : 0.1 + growthFactor * 0.5;
-        const plantRadius = isGrown ? 0.3 : 0.05 + growthFactor * 0.25;
+        const plantHeight = 0.1 + growthFactor * 0.5; // Max height based on maxGrowth
+        const plantRadius = 0.05 + growthFactor * 0.25; // Max radius based on maxGrowth
 
-        // Use a cone for visual variety
         const geometry = new THREE.ConeGeometry(plantRadius, plantHeight, 8);
         const material = new THREE.MeshStandardMaterial({ color: seedConfig.color });
         const mesh = new THREE.Mesh(geometry, material);
 
         mesh.position.copy(basePosition);
-        mesh.position.y += plantHeight / 2 + yOffset; // Position base of cone slightly above ground
+        mesh.position.y += plantHeight / 2 + yOffset;
         mesh.castShadow = true;
         mesh.receiveShadow = false;
 
-        // Maybe add a highlight or different shape when fully grown?
-        if (isGrown) {
-            // Example: Make it pulse slightly or add an outline? (More complex)
-            // For now, just ensure it's at max size/height.
-             mesh.material.emissive.setHex(seedConfig.color); // Make it glow slightly when ready
-             mesh.material.emissiveIntensity = 0.3;
+        // Add glow if ready or overdue
+        if (isReady) {
+             mesh.material.emissive.setHex(seedConfig.color);
+             mesh.material.emissiveIntensity = 0.4; // Slightly brighter glow
+        } else {
+             mesh.material.emissive.setHex(0x000000); // Ensure no glow if not ready
+             mesh.material.emissiveIntensity = 0;
         }
-
 
         return mesh;
     }
-
 
     // --- Rendering and Updates ---
 

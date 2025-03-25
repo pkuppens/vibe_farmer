@@ -10,6 +10,8 @@ export const CONFIG = {
     ACTIONS_PER_DAY: 10,
     TRASH_SPAWN_CHANCE: 0.25, // Chance for empty cell to become trash overnight
     INITIAL_TRASH_DENSITY: 0.4, // Percentage of grid filled with trash initially
+    HARVEST_DECAY_RATE: 1, // Coins lost per day after fully grown
+    COIN_SPAWN_CHANCE: 0.10, // Chance for coin to spawn with Rainbow Blessing
 
     // Cell Types
     CELL_TYPES: {
@@ -18,6 +20,7 @@ export const CONFIG = {
         WOOD: 'wood',
         STONE: 'stone',
         PLOT: 'plot',
+        COIN_SPAWN: 'coin_spawn',
     },
 
     // Resources
@@ -86,6 +89,17 @@ export const CONFIG = {
                 console.log("Scarecrow purchased! Trash spawn chance reduced.");
             },
             isPurchased: (gameState) => gameState.upgrades.scarecrow,
+        },
+        RAINBOW_BLESSING: { // New Upgrade
+            id: 'RAINBOW_BLESSING',
+            name: 'Rainbow Blessing',
+            description: 'Empty plots have a 10% chance each night to spawn a coin.',
+            cost: { coins: 50, wood: 10, stone: 10 }, // Example cost
+             effect: (gameState) => {
+                gameState.upgrades.rainbowBlessing = true;
+                console.log("Rainbow Blessing purchased! Coins may appear overnight.");
+            },
+            isPurchased: (gameState) => gameState.upgrades.rainbowBlessing,
         }
         // Add more upgrades: Better Axe, Pickaxe, Auto-Harvester?
     },
@@ -98,6 +112,7 @@ export const CONFIG = {
         WOOD: 0xa0522d, // Sienna
         STONE: 0x808080, // Grey
         PLOT: 0x654321, // Darker brown (tilled earth)
+        COIN_SPAWN: 0xFFD700, // Gold color for coin spawn
         HIGHLIGHT: 0xffffff, // White for selection/hover
     },
 
@@ -119,16 +134,23 @@ export function getEffectiveGrowTime(seedType, gameState) {
     return baseTime;
 }
 
-// Helper to calculate yield considering upgrades
-export function calculateYield(seedType, growTime, gameState) {
-     const seedConfig = CONFIG.SEEDS[seedType];
-     if (!seedConfig) return 0;
+// Helper to calculate yield considering upgrades AND DECAY
+export function calculateYield(seedType, growthStage, maxGrowth, gameState) {
+    const seedConfig = CONFIG.SEEDS[seedType];
+    if (!seedConfig) return 0;
 
-     let baseYield = growTime * seedConfig.yieldMultiplier;
-     if (gameState.upgrades.fertilizer) {
-         baseYield *= 1.20; // Apply fertilizer bonus
-     }
-     return Math.floor(baseYield); // Return whole coins
+    let baseYield = maxGrowth * seedConfig.yieldMultiplier; // Base yield depends on TARGET grow time
+
+    // Apply decay if harvest is overdue
+    const overdueDays = Math.max(0, growthStage - maxGrowth);
+    const decay = overdueDays * CONFIG.HARVEST_DECAY_RATE;
+    baseYield = Math.max(1, baseYield - decay); // Ensure yield is at least 1 coin if harvestable
+
+    if (gameState.upgrades.fertilizer) {
+        baseYield *= 1.20; // Apply fertilizer bonus
+    }
+
+    return Math.floor(baseYield); // Return whole coins
 }
 
 // Helper to calculate trash spawn chance considering upgrades

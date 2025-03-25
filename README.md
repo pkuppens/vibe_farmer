@@ -39,3 +39,13 @@ See [ZERO_SHOT.thoughts.md](ZERO_SHOT.thoughts.md)
 Contains a transcript with all files to be created, and how to run.
 
 See [ZERO_SHOT.response.md](ZERO_SHOT.response.md)
+
+### Running the Game
+
+In the root of the project (with Node.js installed):
+
+`npx serve`
+
+And follow the provided link.
+
+Start clicking weeds, stone, and wood, and start farming!

@@ -24,10 +24,11 @@ export class GameLogic {
         }
 
         const cell = this.gameState.getCell(x, y);
-        if (!cell) return; // Should not happen if click is valid
+        if (!cell) return;
 
         let actionTaken = false;
         let message = "";
+        let updateVisuals = true; // Assume visuals need update unless specified otherwise
 
         switch (cell.type) {
             case CONFIG.CELL_TYPES.WEED:
@@ -41,39 +42,72 @@ export class GameLogic {
             case CONFIG.CELL_TYPES.STONE:
                 actionTaken = this.handleStoneClick(cell);
                 message = actionTaken ? "+1 Stone collected." : "Failed to collect stone?";
-                break;
+                break;            // ... (cases for WEED, WOOD, STONE) ...
             case CONFIG.CELL_TYPES.EMPTY:
+                // Store selected seed *before* potential state change
+                const seedToPlant = this.gameState.selectedSeed;
                 actionTaken = this.handleEmptyClick(cell);
-                message = actionTaken ? `Planted ${CONFIG.SEEDS[this.gameState.selectedSeed]?.name}!` : (this.gameState.selectedSeed ? "No seeds selected or cell occupied." : "Select a seed from the inventory to plant.");
+                 // Modify message based on actual outcome
+                if (actionTaken) {
+                     message = `Planted ${CONFIG.SEEDS[seedToPlant]?.name}!`;
+                } else if (seedToPlant) {
+                     message = `Not enough ${CONFIG.SEEDS[seedToPlant]?.name} seeds.`;
+                } else {
+                     message = "Select a seed from the inventory to plant.";
+                     updateVisuals = false; // No visual change if no seed selected
+                }
                 break;
+
             case CONFIG.CELL_TYPES.PLOT:
+                // Store plot content *before* potential harvest resets it
+                const plotContentBeforeHarvest = cell.content ? { ...cell.content } : null;
                 actionTaken = this.handlePlotClick(cell);
-                 if (actionTaken) {
-                     const harvestedSeed = cell.content?.seedType; // Get type before clearing
-                     const yieldAmount = cell.content?.yieldAmount || 0; // Get yield stored during harvest
-                     message = `Harvested ${CONFIG.SEEDS[harvestedSeed]?.name}! +${yieldAmount} Coins.`;
+                 if (actionTaken && plotContentBeforeHarvest) {
+                     // Calculate yield based on state *before* harvest
+                     const yieldAmount = calculateYield(
+                         plotContentBeforeHarvest.seedType,
+                         plotContentBeforeHarvest.growthStage,
+                         plotContentBeforeHarvest.maxGrowth,
+                         this.gameState
+                     );
+                     // Use stored info for message
+                     message = `Harvested ${CONFIG.SEEDS[plotContentBeforeHarvest.seedType]?.name}! +${yieldAmount} Coins.`;
                  } else {
                      message = "This plot isn't ready for harvest yet.";
+                     updateVisuals = false; // No visual change if not harvested
                  }
                 break;
+
+            case CONFIG.CELL_TYPES.COIN_SPAWN: // Handle clicking spawned coin
+                 actionTaken = this.handleCoinSpawnClick(cell);
+                 message = actionTaken ? "+1 Coin collected!" : "Failed to collect coin?";
+                 break;
+
             default:
                 console.warn(`Unhandled cell type clicked: ${cell.type}`);
                 message = "Nothing to do here.";
+                updateVisuals = false;
         }
 
         if (actionTaken) {
             this.gameState.spendAction();
-            this.sceneManager.updateCellVisuals(cell); // Update visuals AFTER state change
+            if (updateVisuals) {
+                this.sceneManager.updateCellVisuals(cell); // Update visuals AFTER state change
+            }
             this.uiManager.updateAll(this.gameState); // Update entire UI
             this.uiManager.displayMessage(message);
 
             if (this.gameState.actionsLeft <= 0) {
+                // Automatically end day if out of actions
+                // Ensure tooltip is hidden before night processing starts
+                this.uiManager.handleHoverEnd();
                 this.endDay();
             }
-        } else {
-             this.uiManager.displayMessage(message, 4000); // Display failure/info message longer
+        } else if (message) {
+             this.uiManager.displayMessage(message, 4000); // Display failure/info message
         }
     }
+
 
     // --- Specific Click Handlers ---
 
@@ -115,24 +149,30 @@ export class GameLogic {
     }
 
     handlePlotClick(cell) {
-        if (this.gameState.isPlotFullyGrown(cell.x, cell.y)) {
-            // Harvest
-            const plotContent = cell.content;
-            const growTime = plotContent.maxGrowth; // Use the actual time it took
-            const yieldAmount = calculateYield(plotContent.seedType, growTime, this.gameState);
+        // Use the renamed check function
+        if (this.gameState.isPlotReadyToHarvest(cell.x, cell.y)) {
+            const plotContent = cell.content; // Content is still valid here
+            const yieldAmount = calculateYield(
+                plotContent.seedType,
+                plotContent.growthStage,
+                plotContent.maxGrowth,
+                this.gameState
+            );
 
             this.gameState.addResource(CONFIG.RESOURCES.COIN, yieldAmount);
 
-             // Store yield temporarily for the message log, before clearing content
-            cell.content.yieldAmount = yieldAmount;
-
-            // Reset the cell to empty after harvest
+            // Reset the cell to empty *after* calculations
             this.gameState.setCellType(cell.x, cell.y, CONFIG.CELL_TYPES.EMPTY);
-            // Content is cleared automatically by setCellType
 
             return true; // Harvest successful
         }
         return false; // Not ready for harvest
+    }
+
+    handleCoinSpawnClick(cell) {
+        this.gameState.addResource(CONFIG.RESOURCES.COIN, 1);
+        this.gameState.setCellType(cell.x, cell.y, CONFIG.CELL_TYPES.EMPTY);
+        return true;
     }
 
      // --- Seed Selection Logic ---
@@ -156,6 +196,8 @@ export class GameLogic {
 
     endDay() {
         this.uiManager.displayMessage("Day ended. Processing night...", 0); // Persistent message
+        // Ensure hover state is cleared before night processing
+        this.uiManager.handleHoverEnd();
 
         // Use setTimeout to simulate night processing and allow UI to update
         setTimeout(() => {
@@ -168,21 +210,31 @@ export class GameLogic {
 
     processNight() {
         const trashSpawnChance = getTrashSpawnChance(this.gameState);
+        const coinSpawnChance = CONFIG.COIN_SPAWN_CHANCE;
+        const applyRainbow = this.gameState.upgrades.rainbowBlessing;
 
         for (let y = 0; y < this.gameState.gridSize; y++) {
             for (let x = 0; x < this.gameState.gridSize; x++) {
                 const cell = this.gameState.getCell(x, y);
                 let visualUpdateNeeded = false;
 
-                // 1. Grow plots
+                // 1. Grow plots (or increase overdue days)
                 if (cell.type === CONFIG.CELL_TYPES.PLOT && cell.content) {
                     if (this.gameState.incrementPlotGrowth(x, y)) {
-                         visualUpdateNeeded = true; // Growth happened
+                         visualUpdateNeeded = true;
                     }
                 }
-                // 2. Spawn trash on empty cells
+                // 2. Handle Empty Cells (Trash or Coin Spawn)
                 else if (cell.type === CONFIG.CELL_TYPES.EMPTY) {
-                    if (Math.random() < trashSpawnChance) {
+                    let spawnedSomething = false;
+                    // Check for coin spawn first if upgrade active
+                    if (applyRainbow && Math.random() < coinSpawnChance) {
+                        this.gameState.setCellType(x, y, CONFIG.CELL_TYPES.COIN_SPAWN);
+                        visualUpdateNeeded = true;
+                        spawnedSomething = true;
+                    }
+                    // If no coin spawned, check for trash spawn
+                    if (!spawnedSomething && Math.random() < trashSpawnChance) {
                         const trashTypeRand = Math.random();
                         let newTrashType;
                         if (trashTypeRand < 0.4) newTrashType = CONFIG.CELL_TYPES.WEED;
@@ -194,14 +246,13 @@ export class GameLogic {
                     }
                 }
 
-                // Update visuals if state changed
+                // Update visuals immediately if state changed
+                // (updateGrownPlantVisuals is implicitly handled by calling updateCellVisuals on growth)
                 if (visualUpdateNeeded) {
                     this.sceneManager.updateCellVisuals(cell);
                 }
             }
         }
-         // Special case: Ensure fully grown plants glow after night processing
-         this.updateGrownPlantVisuals();
     }
 
     // Explicitly update visuals for plants that just became fully grown

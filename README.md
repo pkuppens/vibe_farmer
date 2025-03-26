@@ -13,7 +13,7 @@ Vibe Coded Farming Game, using Google's Gemini 2.5 Pro Experimental:
 
 ### Screenshot
 
-![image.png](image.png)
+![image.png](docs/image.png)
 
 ### Just Play It!
 
